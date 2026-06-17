@@ -228,10 +228,11 @@ export function App() {
       receivables
         .map((receivable) => ({
           receivable,
-          installments: monthInstallments.filter((installment) => installment.receivableId === receivable.id)
+          installments: monthInstallments.filter((installment) => installment.receivableId === receivable.id),
+          allInstallments: installments.filter((installment) => installment.receivableId === receivable.id)
         }))
         .filter((item) => item.installments.length > 0),
-    [monthInstallments, receivables]
+    [installments, monthInstallments, receivables]
   );
 
   const pendingReceivablesForMonth = useMemo(
@@ -624,11 +625,12 @@ export function App() {
               {pendingReceivablesForMonth.length === 0 && receivedReceivablesForMonth.length > 0 ? (
                 <div className="quiet-state">Todos os valores deste mês foram recebidos.</div>
               ) : (
-                pendingReceivablesForMonth.map(({ receivable, installments: receivableInstallments }) => (
+                pendingReceivablesForMonth.map(({ receivable, installments: receivableInstallments, allInstallments }) => (
                   <ReceivableCard
                     key={receivable.id}
                     receivable={receivable}
                     installments={receivableInstallments}
+                    allInstallments={allInstallments}
                     onReceive={saveInstallmentPayment}
                     onPartial={(installment) => setModal({ type: "installment-payment", installment })}
                     onEdit={(item) => setModal({ type: "receivable-form", receivable: item })}
@@ -652,11 +654,12 @@ export function App() {
 
                   {receivedListOpen && (
                     <div className="paid-bills-list">
-                      {receivedReceivablesForMonth.map(({ receivable, installments: receivableInstallments }) => (
+                      {receivedReceivablesForMonth.map(({ receivable, installments: receivableInstallments, allInstallments }) => (
                         <ReceivableCard
                           key={receivable.id}
                           receivable={receivable}
                           installments={receivableInstallments}
+                          allInstallments={allInstallments}
                           onReceive={saveInstallmentPayment}
                           onPartial={(installment) => setModal({ type: "installment-payment", installment })}
                           onEdit={(item) => setModal({ type: "receivable-form", receivable: item })}

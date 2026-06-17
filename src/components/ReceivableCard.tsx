@@ -1,12 +1,13 @@
 import { Check, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Receivable, ReceivableInstallment } from "../types";
-import { formatCurrency, formatDate } from "../utils/format";
+import { addMonths, formatCurrency, formatDate } from "../utils/format";
 import { calculateReceivableStatus, isInstallmentOverdue, summarizeInstallments } from "../utils/receivables";
 
 interface ReceivableCardProps {
   receivable: Receivable;
   installments: ReceivableInstallment[];
+  allInstallments?: ReceivableInstallment[];
   onReceive: (installment: ReceivableInstallment, amount: number) => Promise<void>;
   onPartial: (installment: ReceivableInstallment) => void;
   onEdit: (receivable: Receivable) => void;
@@ -22,6 +23,7 @@ const labelMap = {
 export function ReceivableCard({
   receivable,
   installments,
+  allInstallments,
   onReceive,
   onPartial,
   onEdit,
@@ -30,6 +32,8 @@ export function ReceivableCard({
   const [open, setOpen] = useState(false);
   const isIndefinite = Boolean(receivable.indefinite);
   const summary = useMemo(() => summarizeInstallments(installments), [installments]);
+  const planInstallments = allInstallments ?? installments;
+  const planSummary = useMemo(() => summarizeInstallments(planInstallments), [planInstallments]);
   const calculatedStatus = calculateReceivableStatus(installments);
   const status = calculatedStatus;
   const usesDirectPayment = installments.length === 1 && (isIndefinite || receivable.installmentCount <= 1);
@@ -43,6 +47,18 @@ export function ReceivableCard({
       }),
     [installments]
   );
+  const lastInstallmentDate =
+    !isIndefinite && receivable.installmentCount > 0
+      ? addMonths(receivable.firstInstallmentDate, receivable.installmentCount - 1)
+      : planSummary.lastInstallment?.dueDate;
+
+  function getInstallmentNumber(installment: ReceivableInstallment): number {
+    if (isIndefinite || !receivable.firstInstallmentDate) return installment.installmentNumber;
+    const [firstYear, firstMonth] = receivable.firstInstallmentDate.split("-").map(Number);
+    const [dueYear, dueMonth] = installment.dueDate.split("-").map(Number);
+    const derivedNumber = (dueYear - firstYear) * 12 + (dueMonth - firstMonth) + 1;
+    return derivedNumber > 0 ? derivedNumber : installment.installmentNumber;
+  }
 
   return (
     <article className={`receivable-card status-${status}`}>
@@ -80,8 +96,8 @@ export function ReceivableCard({
           </>
         ) : (
           <>
-            <span>{`${summary.paidCount}/${receivable.installmentCount} parcelas`}</span>
-            <span>Última {summary.lastInstallment ? formatDate(summary.lastInstallment.dueDate) : "-"}</span>
+            <span>{`${planSummary.paidCount}/${receivable.installmentCount} parcelas`}</span>
+            <span>Última {lastInstallmentDate ? formatDate(lastInstallmentDate) : "-"}</span>
           </>
         )}
       </div>
@@ -151,7 +167,7 @@ export function ReceivableCard({
                 key={installment.id}
               >
                 <div>
-                  <strong>{isIndefinite ? "Recebimento do mês" : `Parcela ${installment.installmentNumber}`}</strong>
+                  <strong>{isIndefinite ? "Recebimento do mês" : `Parcela ${getInstallmentNumber(installment)}`}</strong>
                   <span>{formatDate(installment.dueDate)}</span>
                   <small>
                     {formatCurrency(installment.receivedAmount)} de {formatCurrency(installment.amount)}
