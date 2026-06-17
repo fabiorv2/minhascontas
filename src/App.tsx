@@ -183,6 +183,52 @@ export function App() {
       });
   }, [installments, monthRef, receivables]);
 
+  useEffect(() => {
+    receivables
+      .filter((receivable) => !receivable.indefinite && receivable.installmentCount > 0)
+      .forEach((receivable) => {
+        const existing = installments.filter((installment) => installment.receivableId === receivable.id);
+        const existingByNumber = new Map(existing.map((installment) => [installment.installmentNumber, installment]));
+        const expected = generateReceivableInstallments(
+          receivable.id,
+          receivable.firstInstallmentDate,
+          receivable.installmentCount,
+          receivable.installmentAmount,
+          receivable.totalAmount
+        );
+
+        expected.forEach((expectedInstallment) => {
+          const current = existingByNumber.get(expectedInstallment.installmentNumber);
+
+          if (!current) {
+            void setItem(
+              "receivableInstallments",
+              `${receivable.id}_${String(expectedInstallment.installmentNumber).padStart(2, "0")}`,
+              expectedInstallment
+            ).catch((cause) =>
+              setError(cause instanceof Error ? cause.message : "Não foi possível ajustar as parcelas.")
+            );
+            return;
+          }
+
+          if (current.dueDate !== expectedInstallment.dueDate || current.amount !== expectedInstallment.amount) {
+            const receivedAmount = Math.min(current.receivedAmount, expectedInstallment.amount);
+            const remainingAmount = calculateRemainingAmount(expectedInstallment.amount, receivedAmount);
+            void updateItem("receivableInstallments", current.id, {
+              dueDate: expectedInstallment.dueDate,
+              amount: expectedInstallment.amount,
+              receivedAmount,
+              remainingAmount,
+              status: remainingAmount === 0 ? "received" : receivedAmount > 0 ? "partial" : "pending",
+              updatedAt: new Date().toISOString()
+            }).catch((cause) =>
+              setError(cause instanceof Error ? cause.message : "Não foi possível ajustar as parcelas.")
+            );
+          }
+        });
+      });
+  }, [installments, receivables]);
+
   const sortedInstances = useMemo(
     () =>
       [...instances].sort((a, b) => {
